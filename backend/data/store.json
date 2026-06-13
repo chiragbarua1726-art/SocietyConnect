@@ -1,0 +1,299 @@
+{
+  "admin": {
+    "id": "admin-1",
+    "name": "Society Admin",
+    "email": "admin@society.com",
+    "passwordHash": "$2b$10$24hBpsPM3V7L30dpofSDeOtrJpgPEa9IAitZj0H8nmfseu5Z.KNrS",
+    "role": "admin"
+  },
+  "residents": [
+    {
+      "id": "res-1",
+      "name": "Alex Johnson",
+      "phone": "+91 98765 43210",
+      "email": "alex.johnson@email.com",
+      "googleId": null,
+      "passwordHash": "$2b$10$glUWWMXLwcwezLyas6X8jOFjllCvabuTbnEavlYPMm/phMMldruDm",
+      "unit": "Block A - 402",
+      "status": "active",
+      "joinedAt": "Oct 01, 2024",
+      "preferences": {
+        "complaints": true,
+        "payments": true,
+        "notices": true,
+        "schedule": false
+      },
+      "complaints": [
+        {
+          "id": "C-3791",
+          "title": "leak",
+          "category": "Plumbing",
+          "categoryIcon": "plumbing",
+          "status": "Assigned",
+          "priority": "Medium",
+          "date": "Jun 13, 2026",
+          "time": "09:28 PM",
+          "description": "burst of sink pipwline",
+          "technician": "ravi",
+          "unit": "Block A - 402"
+        },
+        {
+          "id": "C-8294",
+          "title": "Kitchen Pipe Leakage",
+          "category": "Plumbing",
+          "categoryIcon": "plumbing",
+          "status": "Resolved",
+          "priority": "Urgent",
+          "date": "Oct 24, 2024",
+          "time": "09:30 AM",
+          "description": "Water dripping from main inlet pipe under the sink.",
+          "technician": "Ravi Kumar",
+          "unit": "Block A - 402"
+        },
+        {
+          "id": "C-8210",
+          "title": "Living Room Light Switch",
+          "category": "Electrical",
+          "categoryIcon": "bolt",
+          "status": "Assigned",
+          "priority": "Medium",
+          "date": "Oct 22, 2024",
+          "time": "02:15 PM",
+          "description": "Main chandelier switch sparks when turned on.",
+          "technician": "Suresh Mehta",
+          "unit": "Block A - 402"
+        },
+        {
+          "id": "C-8155",
+          "title": "Loose Main Door Handle",
+          "category": "Carpentry",
+          "categoryIcon": "carpenter",
+          "status": "Resolved",
+          "priority": "Low",
+          "date": "Oct 15, 2024",
+          "time": "11:00 AM",
+          "description": "Door handle is very loose and needs tightening.",
+          "technician": "Ramesh Nair",
+          "unit": "Block A - 402"
+        }
+      ],
+      "bills": [
+        {
+          "id": "INV-1781364344267",
+          "type": "Monthly Maintenance",
+          "amount": 5500,
+          "dueDate": "Jul 15, 2026",
+          "period": "Jul 2026",
+          "status": "Unpaid",
+          "breakdown": [
+            {
+              "label": "Monthly Maintenance",
+              "amt": 5500
+            }
+          ],
+          "lastTransaction": null
+        },
+        {
+          "id": "INV-2024-1004",
+          "type": "Maintenance Charges",
+          "amount": 4500,
+          "dueDate": "Nov 15, 2024",
+          "status": "Paid",
+          "breakdown": [
+            {
+              "label": "Maintenance Charges",
+              "amt": 4500
+            },
+            {
+              "label": "Common Area Electricity",
+              "amt": 850
+            },
+            {
+              "label": "Security & Staff Fund",
+              "amt": 400
+            }
+          ],
+          "period": "Oct 2024",
+          "lastTransaction": {
+            "paymentId": "TXN3272133731",
+            "paymentMethod": "UPI",
+            "paymentSource": "demo",
+            "paidAt": "Jun 11, 2026 06:25 PM",
+            "totalPaid": 4517.7
+          }
+        }
+      ],
+      "history": [
+        {
+          "id": "H1781366327200",
+          "type": "Complaint",
+          "icon": "report_problem",
+          "title": "leak",
+          "ref": "#C-3791",
+          "date": "Jun 13, 2026",
+          "time": "09:28 PM",
+          "status": "Pending",
+          "amount": null
+        },
+        {
+          "id": "H1",
+          "type": "Complaint",
+          "icon": "report_problem",
+          "title": "Leaking Pipe in Master Bathroom",
+          "ref": "#C-82910",
+          "date": "Oct 12, 2024",
+          "time": "10:45 AM",
+          "status": "Resolved",
+          "amount": null
+        },
+        {
+          "id": "H2",
+          "type": "Payment",
+          "icon": "payments",
+          "title": "Monthly Maintenance Fee - Oct",
+          "ref": "INV-2024-10-04",
+          "date": "Oct 05, 2024",
+          "time": "02:15 PM",
+          "status": "Paid",
+          "amount": "₹5,750.00"
+        }
+      ],
+      "notifications": [
+        {
+          "id": 1781366987429,
+          "read": false,
+          "icon": "engineering",
+          "title": "ravi assigned to your complaint: leak",
+          "time": "Just now"
+        },
+        {
+          "id": 1781366327200,
+          "read": false,
+          "icon": "report_problem",
+          "title": "Complaint submitted: leak",
+          "time": "Just now"
+        },
+        {
+          "id": 1,
+          "icon": "report_problem",
+          "title": "Your complaint #C-8210 has been assigned.",
+          "time": "2 hours ago",
+          "read": false
+        },
+        {
+          "id": 2,
+          "icon": "payments",
+          "title": "Your maintenance bill is due in 5 days.",
+          "time": "Yesterday",
+          "read": false
+        },
+        {
+          "id": 3,
+          "icon": "campaign",
+          "title": "Lift maintenance scheduled for tomorrow.",
+          "time": "2 days ago",
+          "read": true
+        }
+      ],
+      "bookings": []
+    },
+    {
+      "id": "res-1781367269152",
+      "name": "chirag",
+      "email": "chirag.barua6904@gmail.com",
+      "phone": "9667209620",
+      "unit": "barua",
+      "googleId": null,
+      "passwordHash": "$2b$10$t0v4DjyEzCfio9Eeyk9ahed24fugwpmTZTd0YHbGYm/cJbTbZhMuK",
+      "status": "active",
+      "joinedAt": "Jun 13, 2026",
+      "preferences": {
+        "complaints": true,
+        "payments": true,
+        "notices": true,
+        "schedule": false
+      },
+      "complaints": [],
+      "bills": [],
+      "history": [],
+      "notifications": [
+        {
+          "id": 1781367343915,
+          "read": false,
+          "icon": "check_circle",
+          "title": "Your account has been approved! Welcome to SocietyConnect.",
+          "time": "Just now"
+        },
+        {
+          "id": 1781367269152,
+          "read": false,
+          "icon": "waving_hand",
+          "title": "Welcome to SocietyConnect, chirag!",
+          "time": "Just now"
+        }
+      ],
+      "bookings": []
+    }
+  ],
+  "scheduleEvents": [
+    {
+      "id": "E1",
+      "title": "Lift Maintenance - Block A",
+      "icon": "elevator",
+      "color": "primary",
+      "date": "Tomorrow",
+      "time": "09:00 AM – 12:00 PM",
+      "location": "Service Lift 1 & 2",
+      "desc": "Quarterly preventative maintenance. Lifts will be intermittently unavailable.",
+      "tag": "Building"
+    },
+    {
+      "id": "E2",
+      "title": "Water Tank Cleaning",
+      "icon": "water_drop",
+      "color": "secondary",
+      "date": "Tue, Nov 5",
+      "time": "10:00 AM – 04:00 PM",
+      "location": "Main Reservoir",
+      "desc": "Annual cleaning of underground and overhead water tanks. Low water pressure expected.",
+      "tag": "Building"
+    },
+    {
+      "id": "E4",
+      "title": "Annual Residents Meet 2024",
+      "icon": "groups",
+      "color": "error",
+      "date": "Sun, Nov 10",
+      "time": "10:00 AM – 01:00 PM",
+      "location": "Community Hall",
+      "desc": "Join us for brunch and discussions on society matters.",
+      "tag": "Community"
+    }
+  ],
+  "faqs": [
+    {
+      "q": "How do I update my profile and contact information?",
+      "a": "Navigate to the Settings section. Select 'Profile Information' and click Edit. Ensure you save changes to keep your phone number and email current for society alerts."
+    },
+    {
+      "q": "What is the visitor management policy?",
+      "a": "All visitors must be pre-registered via SocietyConnect. Pre-approved guests receive a QR code for seamless entry at the security gate. Walk-in visitors require host approval before access."
+    },
+    {
+      "q": "How can I raise a technical complaint about the app?",
+      "a": "Use the Complaints section and select 'Technical' as the category. Attach a screenshot if possible. Our IT team responds within 24 hours on working days."
+    },
+    {
+      "q": "When is my maintenance bill due?",
+      "a": "Monthly maintenance bills are due on the 15th of each month. You can view your current dues in the Payments section. Late fees apply after 30 days."
+    },
+    {
+      "q": "How do I book the community hall?",
+      "a": "Go to the Schedule section and click 'New Request'. Choose 'Facility Booking', select the desired date/time, and submit. Approval is typically within 48 hours."
+    }
+  ],
+  "feedback": {
+    "helpful": 0,
+    "notHelpful": 0
+  }
+}
