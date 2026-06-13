@@ -75,8 +75,6 @@ The admin panel lets you assign technicians to complaints, add/delete bills, app
 
 Google accounts must match the resident email registered in `backend/data/store.json`.
 
-deployed url: https://societyconnect-1.onrender.com
-
 ## Razorpay setup
 
 Add your live or test Razorpay credentials to `.env`:
