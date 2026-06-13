@@ -1,3 +1,5 @@
+
+
 # SocietyConnect Full Stack
 
 Resident portal for society maintenance, complaints, bookings, history, help chat, and maintenance bill payments.
@@ -72,6 +74,8 @@ The admin panel lets you assign technicians to complaints, add/delete bills, app
 4. Restart the dev server — the Google button will appear on the login page.
 
 Google accounts must match the resident email registered in `backend/data/store.json`.
+
+deployed url: https://societyconnect-1.onrender.com
 
 ## Razorpay setup
 
