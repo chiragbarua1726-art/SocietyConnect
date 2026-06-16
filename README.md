@@ -42,9 +42,8 @@ npm run dev
 ```
 
 4. Open:
-
-- Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:4000/api`
+   
+url:https://societyconnect-backend.onrender.com
 
 ## Authentication
 
@@ -52,14 +51,14 @@ The portal is protected with JWT authentication. Residents and admins must sign 
 
 ### Resident login
 
-Use the seeded demo account at `http://localhost:5173`:
+Use the seeded demo account at `https://societyconnect-backend.onrender.com`]:
 
 - Email: `alex.johnson@email.com`
 - Password: `resident123`
 
 ### Admin login
 
-Access the admin panel at `http://localhost:5173/admin`:
+Access the admin panel at `https://societyconnect-backend.onrender.com`:
 
 - Email: `admin@society.com`
 - Password: `admin123`
