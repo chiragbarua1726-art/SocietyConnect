@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { adminApi } from "./adminApi.js";
+import LoginPage from "./LoginPage.jsx";
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -1241,6 +1242,8 @@ export default function AdminApp() {
   };
 
   useEffect(() => {
+    // Try to restore an existing admin session via the stored token.
+    // If the token is missing or invalid, clear it and show the login page.
     const token = adminApi.getAdminToken();
     if (!token) {
       setAuthChecking(false);
@@ -1292,9 +1295,21 @@ export default function AdminApp() {
   }
 
   if (!adminUser) {
-    // Not authenticated — send back to the unified login page
-    window.location.href = "/";
-    return null;
+    return (
+      <>
+        <AdminGlobalStyles />
+        <LoginPage
+          onLogin={(user, role) => {
+            if (role === "admin") {
+              setAdminUser(user);
+            } else {
+              // Resident tried to log in on admin page — send them home
+              window.location.href = "/";
+            }
+          }}
+        />
+      </>
+    );
   }
 
   if (error || !data) {
@@ -1323,9 +1338,13 @@ export default function AdminApp() {
     },
     addResidentBill: async (residentId, body) => {
       await adminApi.addResidentBill(residentId, body);
-      // re-fetch full bootstrap to get updated resident bills
-      const payload = await adminApi.bootstrap();
-      setData(payload);
+      try {
+        const payload = await adminApi.bootstrap();
+        setData(payload);
+      } catch {
+        // bootstrap re-fetch failed — the bill was still saved, just refresh manually
+        addToast("Bill added, but panel refresh failed. Please reload.", "info");
+      }
     },
     assignComplaint: async (id, body) => {
       const result = await adminApi.assignComplaint(id, body);

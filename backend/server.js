@@ -14,7 +14,12 @@ import {
   verifyGoogleCredential,
   verifyPassword,
 } from "./lib/auth.js";
-import { getGatewayConfig, getPaymentTotals, createOrder, verifySignature } from "./lib/payment.js";
+import {
+  getGatewayConfig,
+  getPaymentTotals,
+  createOrder,
+  verifySignature,
+} from "./lib/payment.js";
 import { readStore, updateStore } from "./lib/store.js";
 
 const app = express();
@@ -36,7 +41,8 @@ function nowParts() {
 }
 
 function createComplaintId() {
-  return `C-${Math.floor(Math.random() * 9000 + 1000)}`;
+  // 6-digit to reduce collision probability
+  return `C-${Math.floor(Math.random() * 900000 + 100000)}`;
 }
 
 function createHistoryId() {
@@ -48,40 +54,51 @@ function createTransactionId() {
 }
 
 function formatCurrency(amount) {
-  return `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `₹${Number(amount).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
-/** Find a resident by their id inside store.residents[] */
 function findResident(store, id) {
   return store.residents.find((r) => r.id === id) || null;
+}
+
+function ensureResident(store, id) {
+  const r = findResident(store, id);
+  if (!r) throw new Error("Resident not found");
+  return r;
 }
 
 function buildBootstrapPayload(resident, store) {
   return {
     resident: sanitizeResident(resident),
-    complaints: resident.complaints,
-    bills: resident.bills,
-    history: resident.history,
-    notifications: resident.notifications,
-    scheduleEvents: store.scheduleEvents,
-    bookings: resident.bookings,
-    faqs: store.faqs,
+    complaints: resident.complaints || [],
+    bills: resident.bills || [],
+    history: resident.history || [],
+    notifications: resident.notifications || [],
+    scheduleEvents: store.scheduleEvents || [],
+    bookings: resident.bookings || [],
+    faqs: store.faqs || [],
     paymentGateway: getGatewayConfig(),
   };
 }
 
 function pushNotification(resident, notification) {
+  if (!Array.isArray(resident.notifications)) resident.notifications = [];
   resident.notifications.unshift({ id: Date.now(), read: false, ...notification });
 }
 
 function pushHistory(resident, entry) {
+  if (!Array.isArray(resident.history)) resident.history = [];
   resident.history.unshift({ id: createHistoryId(), ...entry });
 }
 
 function buildChatReply(message, faqs) {
   const text = message.toLowerCase();
-  const match = faqs.find(
-    (faq) => faq.q.toLowerCase().includes(text) || faq.a.toLowerCase().includes(text),
+  const match = (faqs || []).find(
+    (faq) =>
+      faq.q.toLowerCase().includes(text) || faq.a.toLowerCase().includes(text),
   );
   if (match) return match.a;
   if (text.includes("bill") || text.includes("payment"))
@@ -95,35 +112,51 @@ function buildChatReply(message, faqs) {
 
 async function markBillPaid(residentId, { billId, paymentId, paymentMethod, paymentSource }) {
   return updateStore((store) => {
-    const resident = findResident(store, residentId);
-    if (!resident) throw new Error("Resident not found");
-
-    const bill = resident.bills.find((b) => b.id === billId);
+    const resident = ensureResident(store, residentId);
+    const bill = (resident.bills || []).find((b) => b.id === billId);
     if (!bill) throw new Error("Bill not found");
-    if (bill.status === "Paid") return store;
+    if (bill.status === "Paid") return store; // idempotent
 
     const { date, time } = nowParts();
     const totals = getPaymentTotals(bill.amount);
 
     bill.status = "Paid";
-    bill.lastTransaction = { paymentId, paymentMethod, paymentSource, paidAt: `${date} ${time}`, totalPaid: totals.total };
+    bill.lastTransaction = {
+      paymentId,
+      paymentMethod,
+      paymentSource,
+      paidAt: `${date} ${time}`,
+      totalPaid: totals.total,
+    };
 
-    pushNotification(resident, { icon: "payments", title: `Payment of ${formatCurrency(totals.total)} successful`, time: "Just now" });
+    pushNotification(resident, {
+      icon: "payments",
+      title: `Payment of ${formatCurrency(totals.total)} successful`,
+      time: "Just now",
+    });
     pushHistory(resident, {
-      type: "Payment", icon: "payments",
+      type: "Payment",
+      icon: "payments",
       title: `${bill.type} - ${bill.period}`,
-      ref: bill.id, date, time, status: "Paid", amount: formatCurrency(totals.total),
+      ref: bill.id,
+      date,
+      time,
+      status: "Paid",
+      amount: formatCurrency(totals.total),
     });
     return store;
   });
 }
 
-// ── Public routes ──────────────────────────────────────────────────────────────
+// ── Public routes ─────────────────────────────────────────────────────────────
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 app.get("/api/auth/config", (_req, res) => {
-  res.json({ googleClientId: getGoogleClientId() || null, googleEnabled: isGoogleConfigured() });
+  res.json({
+    googleClientId: getGoogleClientId() || null,
+    googleEnabled: isGoogleConfigured(),
+  });
 });
 
 // Register new resident
@@ -138,7 +171,9 @@ app.post("/api/auth/register", async (req, res, next) => {
     }
 
     const store = await readStore();
-    const exists = store.residents.find((r) => r.email.toLowerCase() === email.trim().toLowerCase());
+    const exists = store.residents.find(
+      (r) => r.email.toLowerCase() === email.trim().toLowerCase(),
+    );
     if (exists) {
       return res.status(409).json({ message: "An account with this email already exists." });
     }
@@ -154,14 +189,20 @@ app.post("/api/auth/register", async (req, res, next) => {
       unit: unit.trim(),
       googleId: null,
       passwordHash,
-      status: "pending",   // admin must approve before they can log in
+      status: "pending",
       joinedAt: date,
       preferences: { complaints: true, payments: true, notices: true, schedule: false },
       complaints: [],
       bills: [],
       history: [],
       notifications: [
-        { id: Date.now(), read: false, icon: "waving_hand", title: `Welcome to SocietyConnect, ${name.trim()}!`, time: "Just now" },
+        {
+          id: Date.now(),
+          read: false,
+          icon: "waving_hand",
+          title: `Welcome to SocietyConnect, ${name.trim()}!`,
+          time: "Just now",
+        },
       ],
       bookings: [],
     };
@@ -171,7 +212,10 @@ app.post("/api/auth/register", async (req, res, next) => {
       return s;
     });
 
-    res.status(201).json({ message: "Registration submitted. Please wait for admin approval before signing in." });
+    res.status(201).json({
+      message:
+        "Registration submitted. Please wait for admin approval before signing in.",
+    });
   } catch (error) {
     next(error);
   }
@@ -184,17 +228,23 @@ app.post("/api/auth/login", async (req, res, next) => {
       return res.status(400).json({ message: "Email and password are required." });
 
     const store = await readStore();
-    const resident = store.residents.find((r) => r.email.toLowerCase() === email.trim().toLowerCase());
+    const resident = store.residents.find(
+      (r) => r.email.toLowerCase() === email.trim().toLowerCase(),
+    );
     if (!resident) return res.status(401).json({ message: "Invalid email or password." });
 
     const valid = await verifyPassword(password, resident.passwordHash);
     if (!valid) return res.status(401).json({ message: "Invalid email or password." });
 
     if (resident.status === "pending") {
-      return res.status(403).json({ message: "Your account is pending admin approval. Please check back soon." });
+      return res
+        .status(403)
+        .json({ message: "Your account is pending admin approval. Please check back soon." });
     }
     if (resident.status === "suspended") {
-      return res.status(403).json({ message: "Your account has been suspended. Contact the admin." });
+      return res
+        .status(403)
+        .json({ message: "Your account has been suspended. Contact the admin." });
     }
 
     res.json({ token: signToken(resident), resident: sanitizeResident(resident) });
@@ -206,20 +256,26 @@ app.post("/api/auth/login", async (req, res, next) => {
 app.post("/api/auth/google", async (req, res, next) => {
   try {
     const { credential } = req.body;
-    if (!credential) return res.status(400).json({ message: "Google credential is required." });
+    if (!credential)
+      return res.status(400).json({ message: "Google credential is required." });
 
     const payload = await verifyGoogleCredential(credential);
     const store = await readStore();
     const resident = store.residents.find(
-      (r) => r.email.toLowerCase() === payload.email.toLowerCase() ||
-             (r.googleId && r.googleId === payload.sub),
+      (r) =>
+        r.email.toLowerCase() === payload.email.toLowerCase() ||
+        (r.googleId && r.googleId === payload.sub),
     );
 
     if (!resident) {
-      return res.status(403).json({ message: "This Google account is not registered. Please register first." });
+      return res.status(403).json({
+        message: "This Google account is not registered. Please register first.",
+      });
     }
     if (resident.status === "pending") {
-      return res.status(403).json({ message: "Your account is pending admin approval." });
+      return res
+        .status(403)
+        .json({ message: "Your account is pending admin approval." });
     }
     if (resident.status === "suspended") {
       return res.status(403).json({ message: "Your account has been suspended." });
@@ -227,6 +283,7 @@ app.post("/api/auth/google", async (req, res, next) => {
 
     const nextStore = await updateStore((s) => {
       const r = findResident(s, resident.id);
+      if (!r) throw new Error("Resident not found");
       r.googleId = payload.sub;
       if (payload.name && !r.name) r.name = payload.name;
       return s;
@@ -239,7 +296,7 @@ app.post("/api/auth/google", async (req, res, next) => {
   }
 });
 
-// ── Admin public route ─────────────────────────────────────────────────────────
+// ── Admin login ───────────────────────────────────────────────────────────────
 
 app.post("/api/admin/login", async (req, res, next) => {
   try {
@@ -255,14 +312,14 @@ app.post("/api/admin/login", async (req, res, next) => {
     const valid = await verifyPassword(password, admin.passwordHash);
     if (!valid) return res.status(401).json({ message: "Invalid credentials." });
 
-    const { passwordHash, ...safeAdmin } = admin;
+    const { passwordHash: _ph, ...safeAdmin } = admin;
     res.json({ token: signToken(admin), admin: safeAdmin });
   } catch (error) {
     next(error);
   }
 });
 
-// ── Resident protected routes ──────────────────────────────────────────────────
+// ── Resident protected routes ─────────────────────────────────────────────────
 
 app.get("/api/auth/me", requireAuth, async (req, res, next) => {
   try {
@@ -293,13 +350,16 @@ app.post("/api/complaints", requireAuth, async (req, res, next) => {
       return res.status(400).json({ message: "Title and description are required." });
 
     const nextStore = await updateStore((store) => {
-      const resident = findResident(store, req.user.sub);
-      if (!resident) throw new Error("Resident not found");
-
+      const resident = ensureResident(store, req.user.sub);
       const { date, time } = nowParts();
       const categoryIconMap = {
-        Plumbing: "plumbing", Electrical: "bolt", Carpentry: "carpenter",
-        Cleaning: "cleaning_services", HVAC: "ac_unit", General: "more_horiz", Technical: "memory",
+        Plumbing: "plumbing",
+        Electrical: "bolt",
+        Carpentry: "carpenter",
+        Cleaning: "cleaning_services",
+        HVAC: "ac_unit",
+        General: "more_horiz",
+        Technical: "memory",
       };
       const complaint = {
         id: createComplaintId(),
@@ -308,14 +368,29 @@ app.post("/api/complaints", requireAuth, async (req, res, next) => {
         categoryIcon: categoryIconMap[category] || "help",
         status: "Pending",
         priority: priority || "Medium",
-        date, time,
+        date,
+        time,
         description: description.trim(),
         technician: null,
         unit: resident.unit,
       };
+      if (!Array.isArray(resident.complaints)) resident.complaints = [];
       resident.complaints.unshift(complaint);
-      pushNotification(resident, { icon: "report_problem", title: `Complaint submitted: ${complaint.title}`, time: "Just now" });
-      pushHistory(resident, { type: "Complaint", icon: "report_problem", title: complaint.title, ref: `#${complaint.id}`, date, time, status: complaint.status, amount: null });
+      pushNotification(resident, {
+        icon: "report_problem",
+        title: `Complaint submitted: ${complaint.title}`,
+        time: "Just now",
+      });
+      pushHistory(resident, {
+        type: "Complaint",
+        icon: "report_problem",
+        title: complaint.title,
+        ref: `#${complaint.id}`,
+        date,
+        time,
+        status: complaint.status,
+        amount: null,
+      });
       return store;
     });
 
@@ -330,14 +405,26 @@ app.patch("/api/complaints/:complaintId/resolve", requireAuth, async (req, res, 
   try {
     const { complaintId } = req.params;
     const nextStore = await updateStore((store) => {
-      const resident = findResident(store, req.user.sub);
-      if (!resident) throw new Error("Resident not found");
-      const complaint = resident.complaints.find((c) => c.id === complaintId);
+      const resident = ensureResident(store, req.user.sub);
+      const complaint = (resident.complaints || []).find((c) => c.id === complaintId);
       if (!complaint) throw new Error("Complaint not found");
       complaint.status = "Resolved";
       const { date, time } = nowParts();
-      pushNotification(resident, { icon: "check_circle", title: `Complaint ${complaint.id} marked resolved.`, time: "Just now" });
-      pushHistory(resident, { type: "Complaint", icon: "report_problem", title: complaint.title, ref: `#${complaint.id}`, date, time, status: "Resolved", amount: null });
+      pushNotification(resident, {
+        icon: "check_circle",
+        title: `Complaint ${complaint.id} marked resolved.`,
+        time: "Just now",
+      });
+      pushHistory(resident, {
+        type: "Complaint",
+        icon: "report_problem",
+        title: complaint.title,
+        ref: `#${complaint.id}`,
+        date,
+        time,
+        status: "Resolved",
+        amount: null,
+      });
       return store;
     });
 
@@ -351,20 +438,33 @@ app.patch("/api/complaints/:complaintId/resolve", requireAuth, async (req, res, 
 app.post("/api/bookings", requireAuth, async (req, res, next) => {
   try {
     const { facility, date } = req.body;
-    if (!facility || !date) return res.status(400).json({ message: "Facility and date are required." });
+    if (!facility || !date)
+      return res.status(400).json({ message: "Facility and date are required." });
 
     const nextStore = await updateStore((store) => {
-      const resident = findResident(store, req.user.sub);
-      if (!resident) throw new Error("Resident not found");
-
-      const booking = { id: `B${Date.now()}`, facility, date, status: "Pending Approval" };
+      const resident = ensureResident(store, req.user.sub);
+      const bookingId = `B${Date.now()}`;
+      const booking = { id: bookingId, facility, date, status: "Pending Approval" };
+      if (!Array.isArray(resident.bookings)) resident.bookings = [];
       resident.bookings.unshift(booking);
+      if (!Array.isArray(store.scheduleEvents)) store.scheduleEvents = [];
       store.scheduleEvents.unshift({
-        id: `E${Date.now()}`, title: `${facility} Booking Request`, icon: "event_available",
-        color: "tertiary", date, time: "Resident requested slot", location: facility,
-        desc: `Booking request for ${resident.unit}. Awaiting committee approval.`, tag: "Personal",
+        id: `E${Date.now()}`,
+        bookingId, // link for future cleanup
+        title: `${facility} Booking Request`,
+        icon: "event_available",
+        color: "tertiary",
+        date,
+        time: "Resident requested slot",
+        location: facility,
+        desc: `Booking request for ${resident.unit}. Awaiting committee approval.`,
+        tag: "Personal",
       });
-      pushNotification(resident, { icon: "calendar_today", title: `Facility booking: ${facility} on ${date}`, time: "Just now" });
+      pushNotification(resident, {
+        icon: "calendar_today",
+        title: `Facility booking: ${facility} on ${date}`,
+        time: "Just now",
+      });
       return store;
     });
 
@@ -379,11 +479,19 @@ app.put("/api/profile", requireAuth, async (req, res, next) => {
   try {
     const { name, phone, email } = req.body;
     const nextStore = await updateStore((store) => {
-      const resident = findResident(store, req.user.sub);
-      if (!resident) throw new Error("Resident not found");
+      const resident = ensureResident(store, req.user.sub);
+
+      // Prevent duplicate email
+      if (email?.trim()) {
+        const newEmail = email.trim().toLowerCase();
+        const duplicate = store.residents.find(
+          (r) => r.id !== resident.id && r.email.toLowerCase() === newEmail,
+        );
+        if (duplicate) throw new Error("Email already in use by another account.");
+        resident.email = newEmail;
+      }
       if (name?.trim()) resident.name = name.trim();
       if (phone?.trim()) resident.phone = phone.trim();
-      if (email?.trim()) resident.email = email.trim();
       return store;
     });
 
@@ -397,9 +505,8 @@ app.put("/api/profile", requireAuth, async (req, res, next) => {
 app.put("/api/preferences", requireAuth, async (req, res, next) => {
   try {
     const nextStore = await updateStore((store) => {
-      const resident = findResident(store, req.user.sub);
-      if (!resident) throw new Error("Resident not found");
-      resident.preferences = { ...resident.preferences, ...req.body };
+      const resident = ensureResident(store, req.user.sub);
+      resident.preferences = { ...(resident.preferences || {}), ...req.body };
       return store;
     });
 
@@ -425,6 +532,7 @@ app.post("/api/feedback", requireAuth, async (req, res, next) => {
   try {
     const { helpful } = req.body;
     const nextStore = await updateStore((store) => {
+      if (!store.feedback) store.feedback = { helpful: 0, notHelpful: 0 };
       if (helpful) store.feedback.helpful += 1;
       else store.feedback.notHelpful += 1;
       return store;
@@ -435,21 +543,30 @@ app.post("/api/feedback", requireAuth, async (req, res, next) => {
   }
 });
 
-// ── Payment routes ─────────────────────────────────────────────────────────────
+// ── Payment routes ────────────────────────────────────────────────────────────
 
 app.post("/api/payments/create-order", requireAuth, async (req, res, next) => {
   try {
     const { billId } = req.body;
+    if (!billId) return res.status(400).json({ message: "billId is required." });
+
     const store = await readStore();
     const resident = findResident(store, req.user.sub);
     if (!resident) return res.status(403).json({ message: "Resident not found." });
 
-    const bill = resident.bills.find((b) => b.id === billId);
+    const bill = (resident.bills || []).find((b) => b.id === billId);
     if (!bill) return res.status(404).json({ message: "Bill not found." });
-    if (bill.status === "Paid") return res.status(400).json({ message: "This bill is already paid." });
+    if (bill.status === "Paid")
+      return res.status(400).json({ message: "This bill is already paid." });
 
     const order = await createOrder({ billId, amount: bill.amount, residentName: resident.name });
-    res.json({ order, paymentGateway: getGatewayConfig(), totals: getPaymentTotals(bill.amount), bill, resident });
+    res.json({
+      order,
+      paymentGateway: getGatewayConfig(),
+      totals: getPaymentTotals(bill.amount),
+      bill,
+      resident: sanitizeResident(resident),
+    });
   } catch (error) {
     next(error);
   }
@@ -458,8 +575,13 @@ app.post("/api/payments/create-order", requireAuth, async (req, res, next) => {
 app.post("/api/payments/demo-complete", requireAuth, async (req, res, next) => {
   try {
     const { billId, method } = req.body;
+    if (!billId) return res.status(400).json({ message: "billId is required." });
+
     const nextStore = await markBillPaid(req.user.sub, {
-      billId, paymentId: createTransactionId(), paymentMethod: method || "demo", paymentSource: "demo",
+      billId,
+      paymentId: createTransactionId(),
+      paymentMethod: method || "demo",
+      paymentSource: "demo",
     });
     const resident = findResident(nextStore, req.user.sub);
     res.json(buildBootstrapPayload(resident, nextStore));
@@ -470,11 +592,23 @@ app.post("/api/payments/demo-complete", requireAuth, async (req, res, next) => {
 
 app.post("/api/payments/verify", requireAuth, async (req, res, next) => {
   try {
-    const { billId, razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body;
-    if (!verifySignature({ orderId, paymentId, signature }))
-      return res.status(400).json({ message: "Payment verification failed." });
+    const {
+      billId,
+      razorpay_order_id: orderId,
+      razorpay_payment_id: paymentId,
+      razorpay_signature: signature,
+    } = req.body;
 
-    const nextStore = await markBillPaid(req.user.sub, { billId, paymentId, paymentMethod: "razorpay", paymentSource: orderId });
+    if (!verifySignature({ orderId, paymentId, signature })) {
+      return res.status(400).json({ message: "Payment verification failed." });
+    }
+
+    const nextStore = await markBillPaid(req.user.sub, {
+      billId,
+      paymentId,
+      paymentMethod: "razorpay",
+      paymentSource: orderId,
+    });
     const resident = findResident(nextStore, req.user.sub);
     res.json(buildBootstrapPayload(resident, nextStore));
   } catch (error) {
@@ -482,7 +616,7 @@ app.post("/api/payments/verify", requireAuth, async (req, res, next) => {
   }
 });
 
-// ── Admin routes ───────────────────────────────────────────────────────────────
+// ── Admin routes ──────────────────────────────────────────────────────────────
 
 app.get("/api/admin/bootstrap", requireAdmin, async (_req, res, next) => {
   try {
@@ -491,21 +625,30 @@ app.get("/api/admin/bootstrap", requireAdmin, async (_req, res, next) => {
     res.json({
       admin: safeAdmin,
       residents: store.residents.map(sanitizeResident),
-      scheduleEvents: store.scheduleEvents,
-      faqs: store.faqs,
-      feedback: store.feedback,
+      scheduleEvents: store.scheduleEvents || [],
+      faqs: store.faqs || [],
+      feedback: store.feedback || { helpful: 0, notHelpful: 0 },
       paymentGateway: getGatewayConfig(),
-      // flatten complaints + bills across all residents for admin overview
-      complaints: store.residents.flatMap((r) => r.complaints.map((c) => ({ ...c, residentId: r.id, residentName: r.name }))),
-      bills: store.residents.flatMap((r) => r.bills.map((b) => ({ ...b, residentId: r.id, residentName: r.name, unit: r.unit }))),
-      bookings: store.residents.flatMap((r) => r.bookings.map((b) => ({ ...b, residentId: r.id, residentName: r.name, unit: r.unit }))),
+      complaints: store.residents.flatMap((r) =>
+        (r.complaints || []).map((c) => ({ ...c, residentId: r.id, residentName: r.name })),
+      ),
+      bills: store.residents.flatMap((r) =>
+        (r.bills || []).map((b) => ({ ...b, residentId: r.id, residentName: r.name, unit: r.unit })),
+      ),
+      bookings: store.residents.flatMap((r) =>
+        (r.bookings || []).map((b) => ({
+          ...b,
+          residentId: r.id,
+          residentName: r.name,
+          unit: r.unit,
+        })),
+      ),
     });
   } catch (error) {
     next(error);
   }
 });
 
-// List residents
 app.get("/api/admin/residents", requireAdmin, async (_req, res, next) => {
   try {
     const store = await readStore();
@@ -515,20 +658,24 @@ app.get("/api/admin/residents", requireAdmin, async (_req, res, next) => {
   }
 });
 
-// Approve / suspend / activate a resident
 app.patch("/api/admin/residents/:residentId/status", requireAdmin, async (req, res, next) => {
   try {
     const { residentId } = req.params;
     const { status } = req.body;
-    if (!["active", "pending", "suspended"].includes(status))
+    if (!["active", "pending", "suspended"].includes(status)) {
       return res.status(400).json({ message: "status must be active, pending, or suspended." });
+    }
 
     const nextStore = await updateStore((store) => {
       const resident = findResident(store, residentId);
       if (!resident) throw new Error("Resident not found");
       resident.status = status;
       if (status === "active") {
-        pushNotification(resident, { icon: "check_circle", title: "Your account has been approved! Welcome to SocietyConnect.", time: "Just now" });
+        pushNotification(resident, {
+          icon: "check_circle",
+          title: "Your account has been approved! Welcome to SocietyConnect.",
+          time: "Just now",
+        });
       }
       return store;
     });
@@ -539,11 +686,12 @@ app.patch("/api/admin/residents/:residentId/status", requireAdmin, async (req, r
   }
 });
 
-// Delete a resident
 app.delete("/api/admin/residents/:residentId", requireAdmin, async (req, res, next) => {
   try {
     const { residentId } = req.params;
-    if (residentId === "res-1") return res.status(400).json({ message: "Cannot delete the demo resident." });
+    if (residentId === "res-1") {
+      return res.status(400).json({ message: "Cannot delete the demo resident." });
+    }
 
     const nextStore = await updateStore((store) => {
       const idx = store.residents.findIndex((r) => r.id === residentId);
@@ -557,25 +705,37 @@ app.delete("/api/admin/residents/:residentId", requireAdmin, async (req, res, ne
   }
 });
 
-// Add a bill to a specific resident
+// Add bill to a specific resident
 app.post("/api/admin/residents/:residentId/bills", requireAdmin, async (req, res, next) => {
   try {
     const { residentId } = req.params;
     const { type, amount, dueDate, period, breakdown } = req.body;
-    if (!type || !amount || !dueDate || !period)
-      return res.status(400).json({ message: "type, amount, dueDate and period are required." });
+    if (!type || !amount || !dueDate || !period) {
+      return res
+        .status(400)
+        .json({ message: "type, amount, dueDate and period are required." });
+    }
 
     const nextStore = await updateStore((store) => {
       const resident = findResident(store, residentId);
       if (!resident) throw new Error("Resident not found");
+      if (!Array.isArray(resident.bills)) resident.bills = [];
       const bill = {
-        id: `INV-${Date.now()}`, type, amount: Number(amount), dueDate, period,
+        id: `INV-${Date.now()}`,
+        type,
+        amount: Number(amount),
+        dueDate,
+        period,
         status: "Unpaid",
         breakdown: breakdown || [{ label: type, amt: Number(amount) }],
         lastTransaction: null,
       };
       resident.bills.unshift(bill);
-      pushNotification(resident, { icon: "payments", title: `New bill: ${type} — ${period}`, time: "Just now" });
+      pushNotification(resident, {
+        icon: "payments",
+        title: `New bill: ${type} — ${period}`,
+        time: "Just now",
+      });
       return store;
     });
 
@@ -585,62 +745,169 @@ app.post("/api/admin/residents/:residentId/bills", requireAdmin, async (req, res
   }
 });
 
-// Delete a bill from a resident
-app.delete("/api/admin/residents/:residentId/bills/:billId", requireAdmin, async (req, res, next) => {
+// Delete a bill from a specific resident
+app.delete(
+  "/api/admin/residents/:residentId/bills/:billId",
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const { residentId, billId } = req.params;
+      const nextStore = await updateStore((store) => {
+        const resident = findResident(store, residentId);
+        if (!resident) throw new Error("Resident not found");
+        const idx = (resident.bills || []).findIndex((b) => b.id === billId);
+        if (idx === -1) throw new Error("Bill not found");
+        resident.bills.splice(idx, 1);
+        return store;
+      });
+      res.json({ bills: findResident(nextStore, residentId).bills });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// Admin global billing overview — these route to the first resident that owns the bill
+// POST /api/admin/bills — creates a global bill (broadcasts to all active residents)
+app.post("/api/admin/bills", requireAdmin, async (req, res, next) => {
   try {
-    const { residentId, billId } = req.params;
+    const { type, amount, dueDate, period, breakdown } = req.body;
+    if (!type || !amount || !dueDate || !period) {
+      return res
+        .status(400)
+        .json({ message: "type, amount, dueDate and period are required." });
+    }
+
     const nextStore = await updateStore((store) => {
-      const resident = findResident(store, residentId);
-      if (!resident) throw new Error("Resident not found");
-      const idx = resident.bills.findIndex((b) => b.id === billId);
-      if (idx === -1) throw new Error("Bill not found");
-      resident.bills.splice(idx, 1);
+      const active = store.residents.filter((r) => r.status === "active");
+      if (active.length === 0) throw new Error("No active residents found.");
+      for (const resident of active) {
+        if (!Array.isArray(resident.bills)) resident.bills = [];
+        const bill = {
+          id: `INV-${Date.now()}-${resident.id}`,
+          type,
+          amount: Number(amount),
+          dueDate,
+          period,
+          status: "Unpaid",
+          breakdown: breakdown || [{ label: type, amt: Number(amount) }],
+          lastTransaction: null,
+        };
+        resident.bills.unshift(bill);
+        pushNotification(resident, {
+          icon: "payments",
+          title: `New bill: ${type} — ${period}`,
+          time: "Just now",
+        });
+      }
       return store;
     });
-    res.json({ bills: findResident(nextStore, residentId).bills });
+
+    const bills = nextStore.residents.flatMap((r) =>
+      (r.bills || []).map((b) => ({
+        ...b,
+        residentId: r.id,
+        residentName: r.name,
+        unit: r.unit,
+      })),
+    );
+    res.status(201).json({ bills });
   } catch (error) {
     next(error);
   }
 });
 
-// Assign technician / update complaint status (admin)
-app.patch("/api/admin/complaints/:complaintId/assign", requireAdmin, async (req, res, next) => {
+// DELETE /api/admin/bills/:billId — finds and deletes the bill from whichever resident owns it
+app.delete("/api/admin/bills/:billId", requireAdmin, async (req, res, next) => {
   try {
-    const { complaintId } = req.params;
-    const { technician, status } = req.body;
+    const { billId } = req.params;
     const nextStore = await updateStore((store) => {
       for (const resident of store.residents) {
-        const complaint = resident.complaints.find((c) => c.id === complaintId);
-        if (complaint) {
-          if (technician !== undefined) complaint.technician = technician;
-          if (status) complaint.status = status;
-          if (status === "Resolved") {
-            pushNotification(resident, { icon: "check_circle", title: `Your complaint ${complaint.id} has been resolved.`, time: "Just now" });
-          } else if (status === "Assigned" && technician) {
-            pushNotification(resident, { icon: "engineering", title: `${technician} assigned to your complaint: ${complaint.title}`, time: "Just now" });
-          }
+        const idx = (resident.bills || []).findIndex((b) => b.id === billId);
+        if (idx !== -1) {
+          resident.bills.splice(idx, 1);
           return store;
         }
       }
-      throw new Error("Complaint not found");
+      throw new Error("Bill not found");
     });
-    res.json({ complaints: nextStore.residents.flatMap((r) => r.complaints.map((c) => ({ ...c, residentId: r.id, residentName: r.name }))) });
+
+    const bills = nextStore.residents.flatMap((r) =>
+      (r.bills || []).map((b) => ({
+        ...b,
+        residentId: r.id,
+        residentName: r.name,
+        unit: r.unit,
+      })),
+    );
+    res.json({ bills });
   } catch (error) {
     next(error);
   }
 });
 
-// Approve/reject booking
+// Assign technician / update complaint status
+app.patch(
+  "/api/admin/complaints/:complaintId/assign",
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const { complaintId } = req.params;
+      const { technician, status } = req.body;
+
+      const nextStore = await updateStore((store) => {
+        for (const resident of store.residents) {
+          const complaint = (resident.complaints || []).find(
+            (c) => c.id === complaintId,
+          );
+          if (complaint) {
+            if (technician !== undefined) complaint.technician = technician;
+            if (status) complaint.status = status;
+            if (status === "Resolved") {
+              pushNotification(resident, {
+                icon: "check_circle",
+                title: `Your complaint ${complaint.id} has been resolved.`,
+                time: "Just now",
+              });
+            } else if (status === "Assigned" && technician) {
+              pushNotification(resident, {
+                icon: "engineering",
+                title: `${technician} assigned to your complaint: ${complaint.title}`,
+                time: "Just now",
+              });
+            }
+            return store;
+          }
+        }
+        throw new Error("Complaint not found");
+      });
+
+      const complaints = nextStore.residents.flatMap((r) =>
+        (r.complaints || []).map((c) => ({
+          ...c,
+          residentId: r.id,
+          residentName: r.name,
+        })),
+      );
+      res.json({ complaints });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// Approve / reject booking
 app.patch("/api/admin/bookings/:bookingId", requireAdmin, async (req, res, next) => {
   try {
     const { bookingId } = req.params;
     const { status } = req.body;
-    if (!["Approved", "Rejected"].includes(status))
+    if (!["Approved", "Rejected"].includes(status)) {
       return res.status(400).json({ message: "status must be Approved or Rejected." });
+    }
 
     const nextStore = await updateStore((store) => {
       for (const resident of store.residents) {
-        const booking = resident.bookings.find((b) => b.id === bookingId);
+        const booking = (resident.bookings || []).find((b) => b.id === bookingId);
         if (booking) {
           booking.status = status;
           pushNotification(resident, {
@@ -653,7 +920,16 @@ app.patch("/api/admin/bookings/:bookingId", requireAdmin, async (req, res, next)
       }
       throw new Error("Booking not found");
     });
-    res.json({ bookings: nextStore.residents.flatMap((r) => r.bookings.map((b) => ({ ...b, residentId: r.id, residentName: r.name, unit: r.unit }))) });
+
+    const bookings = nextStore.residents.flatMap((r) =>
+      (r.bookings || []).map((b) => ({
+        ...b,
+        residentId: r.id,
+        residentName: r.name,
+        unit: r.unit,
+      })),
+    );
+    res.json({ bookings });
   } catch (error) {
     next(error);
   }
@@ -663,13 +939,22 @@ app.patch("/api/admin/bookings/:bookingId", requireAdmin, async (req, res, next)
 app.post("/api/admin/schedule", requireAdmin, async (req, res, next) => {
   try {
     const { title, date, time, location, desc, tag, icon, color } = req.body;
-    if (!title || !date) return res.status(400).json({ message: "title and date are required." });
+    if (!title || !date) {
+      return res.status(400).json({ message: "title and date are required." });
+    }
 
     const nextStore = await updateStore((store) => {
+      if (!Array.isArray(store.scheduleEvents)) store.scheduleEvents = [];
       store.scheduleEvents.unshift({
-        id: `E${Date.now()}`, title, icon: icon || "event", color: color || "primary",
-        date, time: time || "TBD", location: location || "Society Premises",
-        desc: desc || "", tag: tag || "Building",
+        id: `E${Date.now()}`,
+        title,
+        icon: icon || "event",
+        color: color || "primary",
+        date,
+        time: time || "TBD",
+        location: location || "Society Premises",
+        desc: desc || "",
+        tag: tag || "Building",
       });
       return store;
     });
@@ -683,7 +968,7 @@ app.delete("/api/admin/schedule/:eventId", requireAdmin, async (req, res, next) 
   try {
     const { eventId } = req.params;
     const nextStore = await updateStore((store) => {
-      const idx = store.scheduleEvents.findIndex((e) => e.id === eventId);
+      const idx = (store.scheduleEvents || []).findIndex((e) => e.id === eventId);
       if (idx === -1) throw new Error("Event not found");
       store.scheduleEvents.splice(idx, 1);
       return store;
@@ -698,8 +983,14 @@ app.delete("/api/admin/schedule/:eventId", requireAdmin, async (req, res, next) 
 app.post("/api/admin/faqs", requireAdmin, async (req, res, next) => {
   try {
     const { q, a } = req.body;
-    if (!q?.trim() || !a?.trim()) return res.status(400).json({ message: "Question and answer are required." });
-    const nextStore = await updateStore((store) => { store.faqs.push({ q: q.trim(), a: a.trim() }); return store; });
+    if (!q?.trim() || !a?.trim()) {
+      return res.status(400).json({ message: "Question and answer are required." });
+    }
+    const nextStore = await updateStore((store) => {
+      if (!Array.isArray(store.faqs)) store.faqs = [];
+      store.faqs.push({ q: q.trim(), a: a.trim() });
+      return store;
+    });
     res.status(201).json({ faqs: nextStore.faqs });
   } catch (error) {
     next(error);
@@ -710,7 +1001,9 @@ app.delete("/api/admin/faqs/:index", requireAdmin, async (req, res, next) => {
   try {
     const idx = Number(req.params.index);
     const nextStore = await updateStore((store) => {
-      if (idx < 0 || idx >= store.faqs.length) throw new Error("FAQ not found");
+      if (!Array.isArray(store.faqs) || idx < 0 || idx >= store.faqs.length) {
+        throw new Error("FAQ not found");
+      }
       store.faqs.splice(idx, 1);
       return store;
     });
@@ -720,7 +1013,7 @@ app.delete("/api/admin/faqs/:index", requireAdmin, async (req, res, next) => {
   }
 });
 
-// Broadcast notification to all active residents
+// Broadcast notification to all active residents (or a specific one)
 app.post("/api/admin/notify", requireAdmin, async (req, res, next) => {
   try {
     const { title, icon, residentId } = req.body;
@@ -731,7 +1024,11 @@ app.post("/api/admin/notify", requireAdmin, async (req, res, next) => {
         ? store.residents.filter((r) => r.id === residentId)
         : store.residents.filter((r) => r.status === "active");
       for (const r of targets) {
-        pushNotification(r, { icon: icon || "campaign", title: title.trim(), time: "Just now" });
+        pushNotification(r, {
+          icon: icon || "campaign",
+          title: title.trim(),
+          time: "Just now",
+        });
       }
       return store;
     });
@@ -741,23 +1038,41 @@ app.post("/api/admin/notify", requireAdmin, async (req, res, next) => {
   }
 });
 
-// ── Error handler ──────────────────────────────────────────────────────────────
+// ── Error handler ─────────────────────────────────────────────────────────────
 
 app.use((error, _req, res, _next) => {
+  console.error("[server error]", error);
   const message = error.message || "Internal server error";
-  const status = message.includes("not found") ? 404 : message.includes("exists") ? 409 : 500;
+  let status = 500;
+  if (message.toLowerCase().includes("not found")) status = 404;
+  else if (message.toLowerCase().includes("already exists") || message.toLowerCase().includes("already in use")) status = 409;
   res.status(status).json({ message });
 });
 
-// ── Static (production) ────────────────────────────────────────────────────────
+// ── Static (production) ───────────────────────────────────────────────────────
 
 app.use(express.static(distDir));
 app.get("*", (req, res, next) => {
   if (req.path.startsWith("/api")) return next();
   if (req.path.startsWith("/admin")) {
-    return res.sendFile(path.join(distDir, "admin.html"), (err) => { if (err) next(); });
+    return res.sendFile(path.join(distDir, "admin.html"), (err) => {
+      if (err) next();
+    });
   }
-  res.sendFile(path.join(distDir, "index.html"), (err) => { if (err) next(); });
+  res.sendFile(path.join(distDir, "index.html"), (err) => {
+    if (err) next();
+  });
 });
 
-app.listen(port, () => console.log(`SocietyConnect backend running on http://localhost:${port}`));
+app.listen(port, () =>
+  console.log(`SocietyConnect backend running on http://localhost:${port}`),
+);
+
+function getRazorpayClient() {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  console.log("KEY ID:", JSON.stringify(keyId));
+  console.log("SECRET length:", keySecret?.length, "starts:", keySecret?.slice(0,4));
+  if (!keyId || !keySecret) return null;
+  return new Razorpay({ key_id: keyId, key_secret: keySecret });
+}

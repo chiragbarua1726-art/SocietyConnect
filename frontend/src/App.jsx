@@ -802,15 +802,20 @@ function PaymentsPage({ bills, paymentGateway, resident, refreshData, addToast, 
           invoiceId: payload.bill.id,
         },
         handler: async (response) => {
-          const updated = await api.verifyPayment({ billId: selectedBill.id, ...response });
-          refreshData(updated);
-          setPaymentResult({
-            billId: selectedBill.id,
-            transactionId: response.razorpay_payment_id,
-            amount: payload.totals.total,
-          });
-          resetFlow();
-          addToast("Payment verified successfully.", "success");
+          try {
+            const updated = await api.verifyPayment({ billId: selectedBill.id, ...response });
+            refreshData(updated);
+            setPaymentResult({
+              billId: selectedBill.id,
+              transactionId: response.razorpay_payment_id,
+              amount: payload.totals.total,
+            });
+            resetFlow();
+            addToast("Payment verified successfully.", "success");
+          } catch (verifyError) {
+            setProcessing(false);
+            addToast(verifyError.message || "Payment verification failed.", "error");
+          }
         },
         modal: {
           ondismiss: () => setProcessing(false),
@@ -1661,12 +1666,12 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Try to restore an existing session. If token is missing or expired, clear it.
     const token = api.getToken();
     if (!token) {
       setAuthChecking(false);
       return;
     }
-
     api
       .getMe()
       .then(({ resident }) => {
@@ -1675,9 +1680,7 @@ export default function App() {
       .catch(() => {
         api.clearToken();
       })
-      .finally(() => {
-        setAuthChecking(false);
-      });
+      .finally(() => setAuthChecking(false));
   }, []);
 
   useEffect(() => {
@@ -1756,7 +1759,13 @@ export default function App() {
           <div style={{ background: "#17191f", border: "1px solid #454850", borderRadius: 16, padding: 32, maxWidth: 480, textAlign: "center" }}>
             <Icon name="error" style={{ fontSize: 40, color: "#fa746f" }} />
             <h2 style={{ margin: "12px 0 6px", color: "#e4e5f0" }}>Unable to load the portal</h2>
-            <p style={{ margin: 0, color: "#a9aab5" }}>{error || "Unknown error"}</p>
+            <p style={{ margin: "0 0 20px", color: "#a9aab5" }}>{error || "Unknown error"}</p>
+            <button
+              onClick={() => { setError(""); loadPortal(); }}
+              style={{ background: "#c7bfff", color: "#3d3092", padding: "10px 24px", borderRadius: 10, border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </>

@@ -79,6 +79,21 @@
       ],
       "bills": [
         {
+          "id": "INV-1781522943458-res-1",
+          "type": "Other",
+          "amount": 25000,
+          "dueDate": "2026-07-12",
+          "period": "12/07/2026",
+          "status": "Unpaid",
+          "breakdown": [
+            {
+              "label": "Other",
+              "amt": 25000
+            }
+          ],
+          "lastTransaction": null
+        },
+        {
           "id": "INV-1781364344267",
           "type": "Monthly Maintenance",
           "amount": 5500,
@@ -160,6 +175,48 @@
       ],
       "notifications": [
         {
+          "id": 1781523505494,
+          "read": false,
+          "icon": "event_available",
+          "title": "Your booking for Community Hall has been approved.",
+          "time": "Just now"
+        },
+        {
+          "id": 1781523454383,
+          "read": false,
+          "icon": "engineering",
+          "title": "ravi assigned to your complaint: leak",
+          "time": "Just now"
+        },
+        {
+          "id": 1781522943458,
+          "read": false,
+          "icon": "payments",
+          "title": "New bill: Other — 12/07/2026",
+          "time": "Just now"
+        },
+        {
+          "id": 1781522888946,
+          "read": false,
+          "icon": "event_available",
+          "title": "Your booking for Community Hall has been approved.",
+          "time": "Just now"
+        },
+        {
+          "id": 1781522856407,
+          "read": false,
+          "icon": "calendar_today",
+          "title": "Facility booking: Community Hall on 2026-07-12",
+          "time": "Just now"
+        },
+        {
+          "id": 1781522840147,
+          "read": false,
+          "icon": "calendar_today",
+          "title": "Facility booking: Community Hall on 2026-07-12",
+          "time": "Just now"
+        },
+        {
           "id": 1781366987429,
           "read": false,
           "icon": "engineering",
@@ -195,7 +252,20 @@
           "read": true
         }
       ],
-      "bookings": []
+      "bookings": [
+        {
+          "id": "B1781522856407",
+          "facility": "Community Hall",
+          "date": "2026-07-12",
+          "status": "Approved"
+        },
+        {
+          "id": "B1781522840147",
+          "facility": "Community Hall",
+          "date": "2026-07-12",
+          "status": "Approved"
+        }
+      ]
     },
     {
       "id": "res-1781367269152",
@@ -214,9 +284,32 @@
         "schedule": false
       },
       "complaints": [],
-      "bills": [],
+      "bills": [
+        {
+          "id": "INV-1781522943458-res-1781367269152",
+          "type": "Other",
+          "amount": 25000,
+          "dueDate": "2026-07-12",
+          "period": "12/07/2026",
+          "status": "Unpaid",
+          "breakdown": [
+            {
+              "label": "Other",
+              "amt": 25000
+            }
+          ],
+          "lastTransaction": null
+        }
+      ],
       "history": [],
       "notifications": [
+        {
+          "id": 1781522943458,
+          "read": false,
+          "icon": "payments",
+          "title": "New bill: Other — 12/07/2026",
+          "time": "Just now"
+        },
         {
           "id": 1781367343915,
           "read": false,
@@ -236,6 +329,30 @@
     }
   ],
   "scheduleEvents": [
+    {
+      "id": "E1781522856407",
+      "bookingId": "B1781522856407",
+      "title": "Community Hall Booking Request",
+      "icon": "event_available",
+      "color": "tertiary",
+      "date": "2026-07-12",
+      "time": "Resident requested slot",
+      "location": "Community Hall",
+      "desc": "Booking request for Block A - 402. Awaiting committee approval.",
+      "tag": "Personal"
+    },
+    {
+      "id": "E1781522840147",
+      "bookingId": "B1781522840147",
+      "title": "Community Hall Booking Request",
+      "icon": "event_available",
+      "color": "tertiary",
+      "date": "2026-07-12",
+      "time": "Resident requested slot",
+      "location": "Community Hall",
+      "desc": "Booking request for Block A - 402. Awaiting committee approval.",
+      "tag": "Personal"
+    },
     {
       "id": "E1",
       "title": "Lift Maintenance - Block A",
