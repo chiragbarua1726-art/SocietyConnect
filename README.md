@@ -32,7 +32,7 @@ npm install
 2. Copy environment variables:
 
 ```bash
-cp .env.example .env
+cp .env
 ```
 
 3. Start frontend and backend together:
@@ -43,7 +43,7 @@ npm run dev
 
 4. Open:
    
-url:https://societyconnect-backend.onrender.com
+url: https://societyconnect-backend.onrender.com
 
 ## Authentication
 
@@ -51,7 +51,7 @@ The portal is protected with JWT authentication. Residents and admins must sign 
 
 ### Resident login
 
-Use the seeded demo account at `https://societyconnect-backend.onrender.com`]:
+Use the seeded demo account at `https://societyconnect-backend.onrender.com`:
 
 - Email: `alex.johnson@email.com`
 - Password: `resident123`
