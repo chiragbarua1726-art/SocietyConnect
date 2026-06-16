@@ -19,7 +19,6 @@ Resident portal for society maintenance, complaints, bookings, history, help cha
 - `frontend/` - Vite + React app
 - `backend/` - Express API and JSON data store
 - `backend/data/store.json` - sample persistent data
-- `.env.example` - environment variables
 
 ## Run locally
 
@@ -29,19 +28,13 @@ Resident portal for society maintenance, complaints, bookings, history, help cha
 npm install
 ```
 
-2. Copy environment variables:
-
-```bash
-cp .env
-```
-
-3. Start frontend and backend together:
+2. Start frontend and backend together:
 
 ```bash
 npm run dev
 ```
 
-4. Open:
+3. Open:
    
 url: https://societyconnect-backend.onrender.com
 
